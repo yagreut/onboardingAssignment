@@ -31,4 +31,17 @@ func main() {
 		"clone_url": input.CloneURL,
 		"size_MB":   input.SizeMB,
 	}).Info("Parsed input JSON successfully")
+
+	repoPath, err := cloneRepo(input.CloneURL)
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to clone repository")
+	}
+
+	files, err := walkFiles(repoPath)
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to walk through files")
+	}
+
+	logrus.WithField("file_count", len(files)).Info("Finished scanning files")
+
 }
