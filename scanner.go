@@ -51,3 +51,19 @@ func walkFiles(root string) ([]os.FileInfo, error) {
 
 	return files, err
 }
+
+func filterLargeFiles(files []os.FileInfo, sizeLimitMB int) []FileOutput {
+	var largeFiles []FileOutput
+	sizeLimitBytes := int64(sizeLimitMB) * 1024 * 1024
+
+	for _, file := range files {
+		if file.Size() > sizeLimitBytes {
+			largeFiles = append(largeFiles, FileOutput{
+				Name: file.Name(),
+				Size: file.Size(),
+			})
+		}
+	}
+
+	return largeFiles
+}
