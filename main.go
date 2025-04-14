@@ -12,6 +12,16 @@ type RepoInput struct {
 	SizeMB   int    `json:"size"` // in MB
 }
 
+type FileOutput struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
+type ScanResult struct {
+	Total int          `json:"total"`
+	Files []FileOutput `json:"files"`
+}
+
 func main() {
 	// Open the input file
 	file, err := os.Open("input.json")
@@ -43,5 +53,19 @@ func main() {
 	}
 
 	logrus.WithField("file_count", len(files)).Info("Finished scanning files")
+
+	largeFiles := filterLargeFiles(files, input.SizeMB)
+
+	result := ScanResult{
+		Total: len(largeFiles),
+		Files: largeFiles,
+	}
+
+	output, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to marshal result")
+	}
+
+	logrus.Info("Scan Result:\n" + string(output))
 
 }
