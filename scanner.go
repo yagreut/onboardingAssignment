@@ -1,67 +1,78 @@
 package main
 
 import (
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
 
-func cloneRepo(url string) (string, error) {
-	// Create a temporary directory
-	tmpDir, err := os.MkdirTemp("", "repo-*")
+// Clone the repo into a temporary directory
+func CloneRepo(cloneURL string) (string, error) {
+	dir, err := os.MkdirTemp("", "repo-*")
 	if err != nil {
 		return "", err
 	}
 
-	logrus.WithField("path", tmpDir).Info("Created temp directory")
-
-	// Run `git clone <url> <tmpDir>`
-	cmd := exec.Command("git", "clone", url, tmpDir)
+	cmd := exec.Command("git", "clone", "--depth=1", cloneURL, dir)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	logrus.WithField("url", url).Info("Cloning repository...")
-	if err := cmd.Run(); err != nil {
+	logrus.Infof("⏳ Cloning repository into %s", dir)
+	err = cmd.Run()
+	if err != nil {
 		return "", err
 	}
 
-	logrus.Info("Repository cloned successfully")
-	return tmpDir, nil
+	logrus.Info("✅ Clone completed")
+	return dir, nil
 }
 
-func walkFiles(root string) ([]os.FileInfo, error) {
-	var files []os.FileInfo
+// Walk the repo and gather all files with their sizes
+func ScanRepo(cloneURL string) ([]FileOutput, error) {
+	repoDir, err := CloneRepo(cloneURL)
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(repoDir)
 
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	var files []FileOutput
+
+	err = filepath.WalkDir(repoDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			logrus.WithError(err).Warn("Error walking path")
-			return nil // Skip error, but continue
+			return err
 		}
-		if !info.IsDir() {
-			files = append(files, info)
-			logrus.WithFields(logrus.Fields{
-				"name": info.Name(),
-				"size": info.Size(),
-			}).Debug("Found file")
+		if !d.Type().IsRegular() {
+			return nil
 		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+
+		relPath := strings.TrimPrefix(path, repoDir+"/")
+		files = append(files, FileOutput{
+			Name: relPath,
+			Size: info.Size(),
+		})
 		return nil
 	})
 
 	return files, err
 }
 
-func filterLargeFiles(files []os.FileInfo, sizeLimitMB int) []FileOutput {
+// Filter out files smaller than the size limit
+func filterLargeFiles(files []FileOutput, sizeMB int) []FileOutput {
 	var largeFiles []FileOutput
-	sizeLimitBytes := int64(sizeLimitMB) * 1024 * 1024
+	limit := int64(sizeMB) * 1024 * 1024
 
 	for _, file := range files {
-		if file.Size() > sizeLimitBytes {
-			largeFiles = append(largeFiles, FileOutput{
-				Name: file.Name(),
-				Size: file.Size(),
-			})
+		if file.Size > limit {
+			largeFiles = append(largeFiles, file)
 		}
 	}
 
