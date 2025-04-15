@@ -6,11 +6,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 )
 
-// Clone the repo into a temporary directory
 func CloneRepo(cloneURL string) (string, error) {
 	dir, err := os.MkdirTemp("", "repo-*")
 	if err != nil {
@@ -31,7 +32,6 @@ func CloneRepo(cloneURL string) (string, error) {
 	return dir, nil
 }
 
-// Walk the repo and gather all files with their sizes
 func ScanRepo(cloneURL string) ([]FileOutput, error) {
 	repoDir, err := CloneRepo(cloneURL)
 	if err != nil {
@@ -39,7 +39,8 @@ func ScanRepo(cloneURL string) ([]FileOutput, error) {
 	}
 	defer os.RemoveAll(repoDir)
 
-	var files []FileOutput
+	// Step 1: Collect all file paths
+	var filePaths []string
 
 	err = filepath.WalkDir(repoDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -48,24 +49,44 @@ func ScanRepo(cloneURL string) ([]FileOutput, error) {
 		if !d.Type().IsRegular() {
 			return nil
 		}
-
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-
-		relPath := strings.TrimPrefix(path, repoDir+"/")
-		files = append(files, FileOutput{
-			Name: relPath,
-			Size: info.Size(),
-		})
+		filePaths = append(filePaths, path)
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return files, err
+	// Step 2: Prepare progress bar + concurrency
+	bar := progressbar.Default(int64(len(filePaths)))
+	fileChan := make(chan FileOutput)
+	var wg sync.WaitGroup
+
+	for _, path := range filePaths {
+		wg.Add(1)
+		go func(p string) {
+			defer wg.Done()
+			info, err := os.Stat(p)
+			if err == nil {
+				relPath := strings.TrimPrefix(p, repoDir+"/")
+				fileChan <- FileOutput{Name: relPath, Size: info.Size()}
+			}
+			bar.Add(1)
+		}(path)
+	}
+
+	go func() {
+		wg.Wait()
+		close(fileChan)
+	}()
+
+	var files []FileOutput
+	for file := range fileChan {
+		files = append(files, file)
+	}
+
+	return files, nil
 }
 
-// Filter out files smaller than the size limit
 func filterLargeFiles(files []FileOutput, sizeMB int) []FileOutput {
 	var largeFiles []FileOutput
 	limit := int64(sizeMB) * 1024 * 1024
