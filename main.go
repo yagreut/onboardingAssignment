@@ -8,7 +8,7 @@ import (
 	"github.com/yagreut/onboardingAssignment/models"
 	"github.com/yagreut/onboardingAssignment/repository"
 	"github.com/yagreut/onboardingAssignment/service"
-	"ogithub.com/yagreut/onboardingAssignment/utils"
+	"github.com/yagreut/onboardingAssignment/utils"
 
 	"github.com/sirupsen/logrus"
 )
