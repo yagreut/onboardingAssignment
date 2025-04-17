@@ -1,107 +1,42 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
+
+	"github.com/yagreut/onboardingAssignment/models"
+	"github.com/yagreut/onboardingAssignment/repository"
+	"github.com/yagreut/onboardingAssignment/service"
+	"ogithub.com/yagreut/onboardingAssignment/utils"
 
 	"github.com/sirupsen/logrus"
 )
 
-type Input struct {
-	CloneURL string `json:"clone_url"`
-	SizeMB   int    `json:"size"`
-}
-
-type FileOutput struct {
-	Name string `json:"name"`
-	Size int64  `json:"size"`
-}
-
-type ScanResult struct {
-	Total int          `json:"total"`
-	Files []FileOutput `json:"files"`
-}
-
-// Ask user for file name, then clone URL and size
-func collectAndSaveInput() (string, error) {
-	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Print("Enter the name of the file to create (e.g. input.json): ")
-	filename, _ := reader.ReadString('\n')
-	filename = strings.TrimSpace(filename)
-
-	fmt.Print("Enter the GitHub clone URL: ")
-	cloneURL, _ := reader.ReadString('\n')
-	cloneURL = strings.TrimSpace(cloneURL)
-
-	fmt.Print("Enter the size limit in MB: ")
-	var size int
-	fmt.Scanln(&size)
-
-	input := Input{
-		CloneURL: cloneURL,
-		SizeMB:   size,
-	}
-
-	data, err := json.MarshalIndent(input, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	err = os.WriteFile(filename, data, 0644)
-	if err != nil {
-		return "", err
-	}
-
-	logrus.Info("✅ Input saved to ", filename)
-	return filename, nil
-}
-
-// Read the input JSON file into a struct
-func readInputFromFile(filename string) (Input, error) {
-	var input Input
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return input, err
-	}
-
-	err = json.Unmarshal(data, &input)
-	return input, err
-}
-
 func main() {
-	// Step 1: Ask user for input + save to a file
-	inputFile, err := collectAndSaveInput()
-	if err != nil {
-		logrus.WithError(err).Fatal("❌ Failed to collect or save input")
+	if len(os.Args) < 2 {
+		logrus.Fatal("Usage: go run main.go <input_file.json>")
 	}
 
-	// Step 2: Read input from that file
-	input, err := readInputFromFile(inputFile)
+	inputFile := os.Args[1]
+
+	input, err := utils.ReadInputFromFile(inputFile)
 	if err != nil {
-		logrus.WithError(err).Fatal("❌ Failed to read input file")
+		logrus.WithError(err).Fatal("Failed to read input")
 	}
 
-	// Step 3: Clone and scan
-	files, err := ScanRepo(input.CloneURL)
+	files, err := repository.ScanRepo(input.CloneURL)
 	if err != nil {
-		logrus.WithError(err).Fatal("❌ Failed to scan repo")
+		logrus.WithError(err).Fatal("Failed to scan repository")
 	}
 
-	largeFiles := filterLargeFiles(files, input.SizeMB)
+	largeFiles := service.FilterLargeFiles(files, input.SizeMB)
 
-	result := ScanResult{
+	result := models.ScanResult{
 		Total: len(largeFiles),
 		Files: largeFiles,
 	}
 
-	output, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		logrus.WithError(err).Fatal("❌ Failed to marshal result")
-	}
-
-	logrus.Info("📊 Scan Result:\n" + string(output))
+	output, _ := json.MarshalIndent(result, "", "  ")
+	fmt.Println(string(output))
 }
