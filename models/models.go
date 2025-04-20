@@ -7,7 +7,7 @@ type Input struct {
 
 type FileOutput struct {
 	Name string `json:"name"`
-	Size int64  `json:"size"`
+	Size int64  `json:"size in MB"`
 }
 
 type ScanResult struct {
