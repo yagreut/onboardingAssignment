@@ -8,7 +8,6 @@ import (
 	"github.com/yagreut/onboardingAssignment/models"
 	"github.com/yagreut/onboardingAssignment/repository"
 	"github.com/yagreut/onboardingAssignment/service"
-	"github.com/yagreut/onboardingAssignment/utils"
 
 	"github.com/sirupsen/logrus"
 )
@@ -20,12 +19,12 @@ func main() {
 
 	inputFile := os.Args[1]
 
-	input, err := utils.ReadInputFromFile(inputFile)
+	input, err := repository.ReadInputFromFile(inputFile)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to read input")
 	}
 
-	files, err := repository.ScanRepo(input.CloneURL)
+	files, err := service.ScanRepo(input.CloneURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to scan repository")
 	}
