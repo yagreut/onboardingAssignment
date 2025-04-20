@@ -5,9 +5,29 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"errors"
+	"regexp"
 
 	"github.com/yagreut/onboardingAssignment/models"
 )
+
+var githubURLPattern = regexp.MustCompile(`^(https:\/\/|git@)github\.com[/:][\w\-]+\/[\w\-]+(\.git)?$`)
+
+func ValidateInput(input models.Input) error {
+	if input.CloneURL == "" {
+		return errors.New("clone URL is required")
+	}
+
+	if !githubURLPattern.MatchString(input.CloneURL) {
+		return errors.New("clone URL must be a valid GitHub link")
+	}
+
+	if input.SizeMB <= 0 {
+		return errors.New("size must be a positive number")
+	}
+
+	return nil
+}
 
 func CloneRepo(cloneURL string) (string, error) {
 	dir, err := os.MkdirTemp("/tmp", "repo-*")

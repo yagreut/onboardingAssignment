@@ -24,12 +24,22 @@ func main() {
 		logrus.WithError(err).Fatal("Failed to read input")
 	}
 
+	// ✅ Validate the input
+	if err := service.ValidateInput(input); err != nil {
+		logrus.WithError(err).Fatal("Invalid input")
+	}
+
 	files, err := service.ScanRepo(input.CloneURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to scan repository")
 	}
 
 	largeFiles := service.FilterLargeFiles(files, input.SizeMB)
+
+	for i := range largeFiles {
+		largeFiles[i].Size = largeFiles[i].Size / (1024 * 1024) // convert bytes to MB
+	}
+	
 
 	result := models.ScanResult{
 		Total: len(largeFiles),
