@@ -46,21 +46,21 @@ func CloneRepo(cloneURL string) (string, error) {
 	return dir, nil
 }
 
-func ScanRepo(cloneURL string) ([]models.FileOutput, error) {
+func ScanRepo(cloneURL string) ([]models.BigFileOutput, error) {
 	repoDir, err := CloneRepo(cloneURL)
 	if err != nil {
 		return nil, err
 	}
 	defer os.RemoveAll(repoDir)
 
-	var results []models.FileOutput
+	var results []models.BigFileOutput
 
 	err = filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return err
 		}
 		rel := strings.TrimPrefix(path, repoDir+"/")
-		results = append(results, models.FileOutput{
+		results = append(results, models.BigFileOutput{
 			Name: rel,
 			Size: info.Size(),
 		})
@@ -70,8 +70,8 @@ func ScanRepo(cloneURL string) ([]models.FileOutput, error) {
 	return results, err
 }
 
-func FilterLargeFiles(files []models.FileOutput, sizeMB int) []models.FileOutput {
-	var large []models.FileOutput
+func FilterLargeFiles(files []models.BigFileOutput, sizeMB int) []models.BigFileOutput {
+	var large []models.BigFileOutput
 	limit := int64(sizeMB) * 1024 * 1024
 
 	for _, f := range files {
