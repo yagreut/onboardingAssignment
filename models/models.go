@@ -5,19 +5,25 @@ type Input struct {
 	SizeMB   int    `json:"size"`
 }
 
+type FileOutput struct {
+	Name     string `json:"name"`
+	Size     int64  `json:"size_in_MB"`
+	FullPath string
+}
+
 type BigFileOutput struct {
-	Name string `json:"name"`
-	Size int64  `json:"size in MB"`
+	Name string  `json:"name"`
+	Size float64 `json:"size_mb"`
 }
 
 type SecretFileOutput struct {
 	Name string `json:"name"`
-	Size int64  `json:"Token was found in row"`
+	Line int    `json:"line"`
 }
 
 type ScanResult struct {
-	TotalBig int          `json:"total big files"`
-	BigFiles []FileOutput `json:"files"`
-	TotalSecret int          `json:"total secret files"`
-	SecretFiles []FileOutput `json:"files"`
+	TotalBig    int                `json:"total_big_files"`
+	BigFiles    []BigFileOutput    `json:"big_files"`
+	TotalSecret int                `json:"total_secret_files"`
+	SecretFiles []SecretFileOutput `json:"secret_files"`
 }

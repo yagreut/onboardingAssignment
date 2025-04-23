@@ -1,17 +1,21 @@
 package service
 
 import (
+	"bufio"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-	"errors"
 	"regexp"
+	"strings"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/yagreut/onboardingAssignment/models"
 )
 
 var githubURLPattern = regexp.MustCompile(`^(https:\/\/|git@)github\.com[/:][\w\-]+\/[\w\-]+(\.git)?$`)
+var githubTokenPattern = regexp.MustCompile(`ghp_[0-9a-zA-Z]{36}`)
 
 func ValidateInput(input models.Input) error {
 	if input.CloneURL == "" {
@@ -46,39 +50,85 @@ func CloneRepo(cloneURL string) (string, error) {
 	return dir, nil
 }
 
-func ScanRepo(cloneURL string) ([]models.BigFileOutput, error) {
+func ScanRepo(cloneURL string) (string, []models.FileOutput, error) {
 	repoDir, err := CloneRepo(cloneURL)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	defer os.RemoveAll(repoDir)
 
-	var results []models.BigFileOutput
+	var results []models.FileOutput
 
 	err = filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return err
+		if err != nil || info.IsDir() || strings.HasPrefix(info.Name(), ".") {
+			if info != nil && info.IsDir() && info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
 		}
-		rel := strings.TrimPrefix(path, repoDir+"/")
-		results = append(results, models.BigFileOutput{
-			Name: rel,
-			Size: info.Size(),
+		rel, err := filepath.Rel(repoDir, path)
+		if err != nil {
+			logrus.WithError(err).Warn("Could not get relative path")
+			rel = path
+		}
+		results = append(results, models.FileOutput{
+			Name:     rel,
+			Size:     info.Size(),
+			FullPath: path,
 		})
 		return nil
 	})
 
-	return results, err
+	return repoDir, results, err
 }
 
-func FilterLargeFiles(files []models.BigFileOutput, sizeMB int) []models.BigFileOutput {
+func FilterLargeAndSecretFiles(files []models.FileOutput, sizeMB int) ([]models.BigFileOutput, []models.SecretFileOutput) {
 	var large []models.BigFileOutput
+	var secret []models.SecretFileOutput
 	limit := int64(sizeMB) * 1024 * 1024
+	const divisor = 1024.0 * 1024.0
 
 	for _, f := range files {
 		if f.Size > limit {
-			large = append(large, f)
+			convertedSize := float64(f.Size) / divisor
+			large = append(large, models.BigFileOutput{
+				Name: f.Name,
+				Size: convertedSize,
+			})
+		} else if f.Size > 0 {
+			// Scan the file for GitHub tokens and get the line number
+			if line := FindGitHubTokenLineInFile(f.FullPath); line > 0 {
+				secret = append(secret, models.SecretFileOutput{
+					Name: f.Name,
+					Line: line,
+				})
+			}
 		}
 	}
 
-	return large
+	return large, secret
+}
+
+func FindGitHubTokenLineInFile(path string) int {
+	file, err := os.Open(path)
+	if err != nil {
+		logrus.WithError(err).Warn("Could not open file for secret scanning")
+		return 0
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	lineNum := 1
+	for scanner.Scan() {
+		if githubTokenPattern.MatchString(scanner.Text()) {
+			return lineNum
+		}
+		lineNum++
+	}
+
+	if err := scanner.Err(); err != nil {
+		logrus.WithError(err).Warn("Error reading file")
+	}
+
+	return 0 // no token found
 }

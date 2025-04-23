@@ -24,28 +24,36 @@ func main() {
 		logrus.WithError(err).Fatal("Failed to read input")
 	}
 
-	// ✅ Validate the input
+	// Validate the input
 	if err := service.ValidateInput(input); err != nil {
 		logrus.WithError(err).Fatal("Invalid input")
 	}
 
-	files, err := service.ScanRepo(input.CloneURL)
+	repoDir, files, err := service.ScanRepo(input.CloneURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to scan repository")
 	}
 
-	largeFiles := service.FilterLargeFiles(files, input.SizeMB)
-
-	for i := range largeFiles {
-		largeFiles[i].Size = largeFiles[i].Size / (1024 * 1024) // convert bytes to MB
+	if repoDir != "" {
+		defer func() {
+			if err := os.RemoveAll(repoDir); err != nil {
+				logrus.WithError(err).Error("Failed to remove temporary directory")
+			}
+		}()
 	}
-	
+
+	largeFiles, secretFiles := service.FilterLargeAndSecretFiles(files, input.SizeMB)
 
 	result := models.ScanResult{
-		Total: len(largeFiles),
-		Files: largeFiles,
+		TotalBig:    len(largeFiles),
+		BigFiles:    largeFiles,
+		TotalSecret: len(secretFiles),
+		SecretFiles: secretFiles,
 	}
 
-	output, _ := json.MarshalIndent(result, "", "  ")
+	output, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to marshal output")
+	}
 	fmt.Println(string(output))
 }
