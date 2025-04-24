@@ -7,14 +7,17 @@ import (
 	"github.com/yagreut/onboardingAssignment/models"
 )
 
-func ReadInputFromFile(path string) (models.Input, error) {
+func ReadInputFromFile(path string) (*models.Input, error) {
 	var input models.Input
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return input, err
+		return nil, err
 	}
 
 	err = json.Unmarshal(data, &input)
-	return input, err
+	if err != nil {
+		return nil, err
+	}
+	return &input, nil
 }

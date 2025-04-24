@@ -6,11 +6,24 @@ type Input struct {
 }
 
 type FileOutput struct {
+	Name     string `json:"name"`
+	Size     int64  `json:"size_in_MB"`
+	FullPath string
+}
+
+type BigFileOutput struct {
+	Name string  `json:"name"`
+	Size float64 `json:"size_mb"`
+}
+
+type SecretFileOutput struct {
 	Name string `json:"name"`
-	Size int64  `json:"size in MB"`
+	Line int    `json:"line"`
 }
 
 type ScanResult struct {
-	Total int          `json:"total"`
-	Files []FileOutput `json:"files"`
+	TotalBig    int                `json:"total_big_files"`
+	BigFiles    []BigFileOutput    `json:"big_files"`
+	TotalSecret int                `json:"total_secret_files"`
+	SecretFiles []SecretFileOutput `json:"secret_files"`
 }
