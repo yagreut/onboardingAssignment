@@ -25,5 +25,8 @@ func ReadInputFromFile(path string) (models.Input, error) {
 	// Unmarshal the JSON data into the Input struct.
 	err = json.Unmarshal(data, &input)
 	// Return the parsed input and any unmarshalling error.
-	return input, err
+	if err != nil {
+		return input, err
+	}
+	return input, nil
 }

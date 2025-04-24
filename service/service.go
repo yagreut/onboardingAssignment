@@ -24,6 +24,46 @@ var githubURLPattern = regexp.MustCompile(`^(https:\/\/|git@)github\.com[/:][\w\
 // Note: This is a basic pattern and might have false positives/negatives.
 var githubTokenPattern = regexp.MustCompile(`ghp_[0-9a-zA-Z]{36}`)
 
+var skipScanExtensions = map[string]bool{
+	// Binary / Compiled
+	".pdf":   true,
+	".exe":   true,
+	".dll":   true,
+	".so":    true,
+	".a":     true,
+	".o":     true,
+	".jar":   true,
+	".class": true,
+	// Archives
+	".zip": true,
+	".gz":  true,
+	".tar": true,
+	".rar": true,
+	".7z":  true,
+	// Images
+	".png":  true,
+	".jpg":  true,
+	".jpeg": true,
+	".gif":  true,
+	".bmp":  true,
+	".tiff": true,
+	".ico":  true,
+	// Vector Images (often problematic for line scanning)
+	".svg": true,
+	// Audio/Video
+	".mp3": true,
+	".wav": true,
+	".mp4": true,
+	".avi": true,
+	".mov": true,
+	".wmv": true,
+	// Fonts
+	".ttf":   true,
+	".otf":   true,
+	".woff":  true,
+	".woff2": true,
+}
+
 // ValidateInput checks if the provided Input data is valid.
 // It ensures the CloneURL is present and matches the GitHub URL pattern,
 // and that SizeMB is a positive integer.
@@ -158,9 +198,18 @@ func FilterLargeAndSecretFiles(files []models.FileOutput, sizeMB int) ([]models.
 				Name: f.Name,
 				Size: convertedSize,
 			})
+			continue // Skip further checks for large files.
 		} else if f.Size > 0 { // Only scan non-empty files that are not large.
 			// Scan the file content for a GitHub token pattern.
 			// FindGitHubTokenLineInFile returns the line number (1-based) or 0.
+			// Get the file extension (lowercase)
+			ext := strings.ToLower(filepath.Ext(f.Name))
+
+			// Check if the extension is in our skip list
+			if skipScanExtensions[ext] {
+				logrus.Debugf("Skipping secret scan for extension %s: %s", ext, f.Name)
+				continue // Skip to the next file
+			}
 			if line := FindGitHubTokenLineInFile(f.FullPath); line > 0 {
 				secret = append(secret, models.SecretFileOutput{
 					Name: f.Name,
