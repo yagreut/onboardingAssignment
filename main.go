@@ -28,7 +28,7 @@ func main() {
 	}
 
 	logrus.Debug("Validating input configuration...")
-	if err := service.ValidateInput(input); err != nil {
+	if err := service.ValidateInput(*input); err != nil {
 		logrus.WithError(err).Fatal("Invalid input configuration")
 	}
 	logrus.Debug("Input validation successful.")
